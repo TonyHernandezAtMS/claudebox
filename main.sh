@@ -353,18 +353,21 @@ main() {
                 local docker_profiles=()
                 local python_only_profiles=("python" "ml" "datascience")
                 
-                for profile in "${current_profiles[@]}"; do
-                    local is_python_only=false
-                    for py_profile in "${python_only_profiles[@]}"; do
-                        if [[ "$profile" == "$py_profile" ]]; then
-                            is_python_only=true
-                            break
+                # Guard against empty array with set -u
+                if [ ${#current_profiles[@]} -gt 0 ]; then
+                    for profile in "${current_profiles[@]}"; do
+                        local is_python_only=false
+                        for py_profile in "${python_only_profiles[@]}"; do
+                            if [[ "$profile" == "$py_profile" ]]; then
+                                is_python_only=true
+                                break
+                            fi
+                        done
+                        if [[ "$is_python_only" == "false" ]]; then
+                            docker_profiles+=("$profile")
                         fi
                     done
-                    if [[ "$is_python_only" == "false" ]]; then
-                        docker_profiles+=("$profile")
-                    fi
-                done
+                fi
                 
                 # Calculate hash only for Docker-affecting profiles
                 local docker_profiles_hash=""
@@ -539,33 +542,39 @@ build_docker_image() {
         done < <(read_profile_section "$profiles_file" "profiles")
         
         # Generate profile installations
-        for profile in "${current_profiles[@]}"; do
-            profile=$(echo "$profile" | tr -d '[:space:]')
-            [[ -z "$profile" ]] && continue
-            
-            # Convert hyphens to underscores for function names
-            local profile_fn="get_profile_${profile//-/_}"
-            if type -t "$profile_fn" >/dev/null; then
-                profile_installations+=$'\n'"$($profile_fn)"
-            fi
-        done
+        # Guard against empty array with set -u
+        if [ ${#current_profiles[@]} -gt 0 ]; then
+            for profile in "${current_profiles[@]}"; do
+                profile=$(echo "$profile" | tr -d '[:space:]')
+                [[ -z "$profile" ]] && continue
+                
+                # Convert hyphens to underscores for function names
+                local profile_fn="get_profile_${profile//-/_}"
+                if type -t "$profile_fn" >/dev/null; then
+                    profile_installations+=$'\n'"$($profile_fn)"
+                fi
+            done
+        fi
         
         # Calculate hash only for Docker-affecting profiles
         local docker_profiles=()
         local python_only_profiles=("python" "ml" "datascience")
         
-        for profile in "${current_profiles[@]}"; do
-            local is_python_only=false
-            for py_profile in "${python_only_profiles[@]}"; do
-                if [[ "$profile" == "$py_profile" ]]; then
-                    is_python_only=true
-                    break
+        # Guard against empty array with set -u
+        if [ ${#current_profiles[@]} -gt 0 ]; then
+            for profile in "${current_profiles[@]}"; do
+                local is_python_only=false
+                for py_profile in "${python_only_profiles[@]}"; do
+                    if [[ "$profile" == "$py_profile" ]]; then
+                        is_python_only=true
+                        break
+                    fi
+                done
+                if [[ "$is_python_only" == "false" ]]; then
+                    docker_profiles+=("$profile")
                 fi
             done
-            if [[ "$is_python_only" == "false" ]]; then
-                docker_profiles+=("$profile")
-            fi
-        done
+        fi
         
         if [[ ${#docker_profiles[@]} -gt 0 ]]; then
             profile_hash=$(printf '%s\n' "${docker_profiles[@]}" | sort | cksum | cut -d' ' -f1)
