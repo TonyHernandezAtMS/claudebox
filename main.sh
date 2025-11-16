@@ -592,6 +592,10 @@ LABEL claudebox.project=\"$project_folder_name\""
     local temp_pi temp_lbs
     temp_pi=$(mktemp) || error "Failed to create temp file"
     temp_lbs=$(mktemp) || error "Failed to create temp file"
+    
+    # Trap to ensure temp files are cleaned up on any exit
+    trap 'rm -f "$temp_pi" "$temp_lbs"' EXIT INT TERM
+    
     printf '%s' "$profile_installations" > "$temp_pi"
     printf '%s' "$labels" > "$temp_lbs"
     
@@ -611,8 +615,10 @@ LABEL claudebox.project=\"$project_folder_name\""
     }
     # Otherwise, print the line unchanged
     { print }
-    ' <<<"$base_dockerfile") || { rm -f "$temp_pi" "$temp_lbs"; error "Failed to apply Dockerfile substitutions"; }
+    ' <<<"$base_dockerfile") || error "Failed to apply Dockerfile substitutions"
     
+    # Clear trap and cleanup temp files
+    trap - EXIT INT TERM
     rm -f "$temp_pi" "$temp_lbs"
 
     # Guard: ensure no unreplaced placeholders remain
